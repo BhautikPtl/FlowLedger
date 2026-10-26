@@ -1,52 +1,69 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
+const User = require('../modules/UserModule');
 
-
-const verifyToken = (req) => {
+const verifyToken = (req, res, next) => {
     const token = req.cookies?.token;
-    if (!token) return null;
+
+    if (!token) {
+        return res.status(401).json({ message: 'Authentication required' });
+    }
 
     try {
-        return jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        if (!decoded.id) {
+            return res.status(401).json({ message: 'Invalid token' });
+        }
+
+        req.userId = decoded.id;
+        req.userRole = decoded.role;
+        req.user = decoded;
+
+        next();
     } catch (error) {
-        return null;
+        return res.status(401).json({
+            message: 'Invalid or expired token'
+        });
     }
 };
 
+const IsloggedIn = async (req, res, next) => {
+    try {
+        const currentUser = await User
+            .findById(req.userId)
+            .select('-password');
 
-const IsloggedIn = (req, res, next) => {
-    const decoded = verifyToken(req);
+        if (!currentUser) {
+            return res.status(401).json({
+                message: 'User not found'
+            });
+        }
 
-    if (!decoded) {
-        return res.status(401).json({ message: "Unauthorized" });
+        req.currentUser = currentUser;
+        next();
+    } catch (error) {
+        if (error.name === 'CastError') {
+            return res.status(401).json({ message: 'Invalid user session' });
+        }
+
+        return res.status(401).json({
+            message: 'Authentication failed'
+        });
     }
-
-    req.userId = decoded.id;
-    req.userRole = decoded.role;
-    next();
 };
-
 
 const adminOnly = (req, res, next) => {
-
-    let role = req.userRole;
-    let userId = req.userId;
-
-
-    if (!userId) {
-        const decoded = verifyToken(req);
-        if (!decoded) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
-        userId = decoded.id;
-        role = decoded.role;
-        req.userId = userId;
-    }
-
-    if (role !== "sadmin") {
-        return res.status(403).json({ message: "Forbidden: Admins only" });
+    if (req.currentUser?.role !== 'sadmin') {
+        return res.status(403).json({
+            message: 'Forbidden: Admins only'
+        });
     }
 
     next();
 };
 
-module.exports = { verifyToken, IsloggedIn, adminOnly };
+module.exports = {
+    verifyToken,
+    IsloggedIn,
+    adminOnly
+};
