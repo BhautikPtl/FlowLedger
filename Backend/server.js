@@ -11,7 +11,10 @@ const cors = require('cors');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookie());
-app.use(cors({ origin: ['http://localhost:5555'] }));
+app.use(cors({
+    origin: 'http://localhost:5555',
+    credentials: true
+}));
 
 app.get('/', (req, res) => {
     res.json({ message: "Server Running" });
@@ -39,7 +42,8 @@ app.post('/register', async (req, res) => {
             name,
             email,
             password: hashedPassword,
-            role: role
+            role: role,
+            accountNumber: Math.floor(10000000 + Math.random() * 90000000)
         });
 
         const token = jwt.sign(
@@ -66,6 +70,43 @@ app.post('/register', async (req, res) => {
         return res.status(500).json({ Message: "Server Error", error: error.message });
     }
 });
+
+app.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+
+        const foundUser = await user.findOne({ email: email });
+        if (!foundUser) {
+            return res.status(401).json({ Message: "Invalid Username & Password" });
+        }
+
+
+        const compare = await bcrypt.compare(password, foundUser.password);
+        if (!compare) {
+            return res.status(401).json({ Message: "Invalid Username & Password" });
+        }
+
+        const token = jwt.sign(
+            { id: foundUser._id, role: foundUser.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        res.cookie('token', token, {
+            maxAge: 24 * 60 * 60 * 1000,
+
+        });
+
+        return res.status(200).json({
+            Message: "Login Successful",
+        });
+
+    } catch (error) {
+        return res.status(500).json({ Message: "Server Error", error: error.message });
+    }
+});
+
 
 app.listen(3000, () => {
     console.log("Server is running on port 3000");
