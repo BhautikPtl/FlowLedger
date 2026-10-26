@@ -24,7 +24,9 @@ function Login() {
             }
             )
 
-            if (data) {
+            if (data.user.role === "sadmin") {
+                navigate("/superadmindashboard")
+            } else {
                 navigate("/dashboard")
             }
         } catch (error) {

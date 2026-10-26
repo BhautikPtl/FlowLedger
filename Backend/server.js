@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const cookie = require('cookie-parser');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
+const { verifyToken, IsloggedIn, adminOnly } = require('./middleware/protected')
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -98,13 +99,24 @@ app.post('/login', async (req, res) => {
 
         });
 
+
         return res.status(200).json({
             Message: "Login Successful",
+            user: foundUser
         });
 
     } catch (error) {
         return res.status(500).json({ Message: "Server Error", error: error.message });
     }
+});
+
+
+app.post('/dashboard', verifyToken, IsloggedIn, (req, res) => {
+    res.status(200).json({ Message: "Welcome" });
+});
+
+app.post('/superadmindashboard', verifyToken, IsloggedIn, adminOnly, (req, res) => {
+    res.status(200).json({ Message: "Welcome super admin" });
 });
 
 
